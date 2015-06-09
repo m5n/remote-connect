@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>m5n.github.io</title>
+        <style>
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+body {
+    background: black;
+    color: #aaa;
+    display: table;
+    font-size: 12pt;
+    line-height: 1.25;
+}
+
+div {
+    display: none;
+}
+
+pre {
+    display: table-cell;
+    padding: 0.25em;
+    vertical-align: bottom;
+}
+
+input {
+    /* TODO: remove these rules if input ends up not visible. */
+    background-color: inherit;
+    border: none;
+    color: inherit;
+    color: black;   /* Hides cursor. */
+    font: inherit;
+    font-family: Fixed, monospace;
+
+    position: absolute;
+    bottom: 0;
+    right: 0;
+}
+
+span {
+    background: #aaa;
+    display: inline-block;
+    height: 1em;
+    position: relative;
+    top: 0.2em;
+    width: 0.55em;
+}
+        </style>
+    </head>
+    <body>
+        <!-- See https://github.com/m5n/m5n.github.io for how this works. -->
+        <pre><span></span></pre>
+        <input>
+        <div>
+Connected to github.map.fastly.net (199.27.79.133)
+
+................................................................................
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+ |    |    |       |       |    |         |      |   |         |  |    |     | 
+      |  ._______          |        .__  __  .__     |   ___.     |  .__     |  
+  _____  |  ____/ ____     |   ____ |__|/  |_|  |__  __ _\_ |__   |  |__| ____  
+ /     \ |___  \ /    \       / ___\|  \   __\  |  \|  |  \ __ \     |  |/  _ \ 
+|  Y Y  \/      \   |  \     / /_/  |  ||  | |   Y  \  |  / \_\ \    |  (  /_/ )
+|__|_|  /_____  /___|  / /\  \___  /|__||__| |___|  /____/|___  / /\ |__|\____/ 
+      \/      \/     \/  \/ /_____/               \/          \/  \/            
+          |                            |    |          |               |
+   |      |   |        |      |        |    |    |     |    |          |   |
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+................................................................................
+.                                                                              .
+. Welcome to m5n.github.io, home of Maarten van Egmond's open source goodness! .
+.                                                                              .
+................................................................................
+
+Username: </div>
+        <script>
+/*global
+    clearInterval,
+    clearTimeout,
+    document,
+    setInterval,
+    setTimeout,
+    window
+ */
+(function () {
+    'use strict';
+
+    var outputNode = document.getElementsByTagName('pre')[0],
+        welcomeMsgNode = document.getElementsByTagName('div')[0],
+        inputNode = document.getElementsByTagName('input')[0],
+        blinkNode = document.getElementsByTagName('span')[0],
+        scriptNode = document.getElementsByTagName('script')[0],
+        blinkTimerId,
+        welcomeMsgDelayTimerId,
+        index,
+        callbackFn,
+        text;
+
+    function blink() {
+        // Span gets rewritten every time, so cannot cache it.
+        blinkNode = document.getElementsByTagName('span')[0];
+        blinkNode.style.visibility =
+            blinkNode.style.visibility === 'hidden' ? 'visible' : 'hidden';
+    }
+
+    function echo(char) {
+        var i,
+            prefix;
+
+        // Don't include '>' for span below as it could have a style attribute.
+        i = outputNode.innerHTML.indexOf('<span');
+        prefix = outputNode.innerHTML.substring(0, i);
+
+        outputNode.innerHTML = prefix + char + '<span></span>';
+
+        if (char === '\n') {
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+    }
+
+    function printChar() {
+        clearInterval(blinkTimerId);   // Keep cursor visible.
+        blinkNode = document.getElementsByTagName('span')[0];
+        blinkNode.style.visibility = 'visible';
+
+        if (index === text.length) {
+            // Entire string is now shown so start blinking cursor.
+            blinkTimerId = setInterval(blink, 500);
+
+            callbackFn();
+
+            return;
+        }
+
+        echo(text.charAt(index));
+
+        index += 1;
+        setTimeout(printChar, 0);
+    }
+
+    function printString(txt, cbFn) {
+        text = txt;
+        index = 0;
+        callbackFn = cbFn;
+        printChar();
+    }
+
+    function swallowEvent(e) {
+        e.cancelBubble = true;
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+    }
+
+    function processCtrlC() {
+        printString(
+            '\nConnection terminated.',
+            function () {
+                clearInterval(blinkTimerId);   // Stop blinking cursor.
+
+                setTimeout(function () {
+                    document.location.href = 'index.html';
+                }, 2500);
+            }
+        );
+
+        // Stop listening for events.
+        document.onclick = undefined;
+        document.onkeydown = undefined;
+        document.onkeypress = undefined;
+
+        // Don't show welcome message, if still pending.
+        clearTimeout(welcomeMsgDelayTimerId);
+    }
+
+    function acceptCtrlC() {
+        document.onkeypress = function (e) {
+            var code;
+
+            e = e || window.event;
+
+            code = e.keyCode || e.which;
+            switch (code) {
+            case 67:   // 'C'
+            case 99:   // 'c'
+                if (e.ctrlKey) {
+                    processCtrlC();
+                }
+                break;
+            }
+        };
+    }
+
+    // TODO: create readInput(prompt, hidden) function
+    function acceptInput() {
+        var passwordInput = false;
+
+        // The virtual keyboard of a mobile device does not come up if
+        // inputNode.focus() is called outside of an event handler.
+        // Since the user must click on an input field to enter text anyway,
+        // use a generic click handler to bring up the keyboard.
+        document.onclick = function () {
+          inputNode.focus();
+        };
+
+        document.onkeydown = function (e) {
+            e = e || window.event;
+            var code = e.keyCode || e.which;
+            if (code === 8) {   // Backspace
+                /\n(.+?)<span/.test(outputNode.innerHTML);   // Get last line.
+                if (RegExp.$1.length > 'Username: '.length) {
+                    // Remove last char.
+                    outputNode.innerHTML = outputNode.innerHTML.replace(
+                        /\n(.+?)<span/,
+                        '\n' + RegExp.$1.substring(0, RegExp.$1.length - 1) +
+                            '<span'
+                    );
+                }
+                swallowEvent(e);   // Prevent browser doing history.back().
+            }
+        };
+        document.onkeypress = function (e) {
+            var code,
+                print = true,
+                swallow = true;
+
+            e = e || window.event;
+
+            // TODO: ignore any control character (PgUp, etc.)
+
+            code = e.keyCode || e.which;
+            switch (code) {
+            case 13:   // Enter
+                print = false;
+
+                printString(
+                    passwordInput ? '\nUsername: ' : '\nPassword: ',
+                    function () {
+                        passwordInput = !passwordInput;
+                    }
+                );
+
+                break;
+            case 67:   // 'C'
+            case 99:   // 'c'
+                if (e.ctrlKey) {
+                    print = false;
+
+                    processCtrlC();
+                }
+                break;
+            case 82:   // 'R'
+            case 114:   // 'r'
+                if (e.ctrlKey) {
+                    print = false;
+                    swallow = false;
+                }
+                break;
+            }
+
+            if (print) {
+                echo(passwordInput ? '*' : String.fromCharCode(code));
+            }
+
+            if (swallow) {
+                swallowEvent(e);   // Prevent browser default behavior.
+            }
+        };
+    }
+
+    scriptNode.parentNode.removeChild(scriptNode);
+    welcomeMsgNode.parentNode.removeChild(welcomeMsgNode);
+
+    blinkTimerId = setInterval(blink, 500);
+
+    printString('Connecting...', acceptCtrlC);
+
+    welcomeMsgDelayTimerId = setTimeout(function () {
+        printString(welcomeMsgNode.innerHTML, acceptInput);
+    }, 4000);
+}());
+        </script>
+    </body>
+</html>
+
